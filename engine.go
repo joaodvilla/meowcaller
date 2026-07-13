@@ -765,7 +765,60 @@ func resolvePeerLID(ctx context.Context, cli *whatsmeow.Client, target string) (
 	if lid, err := cli.Store.LIDs.GetLIDForPN(ctx, jid); err == nil && !lid.IsEmpty() {
 		return lid, nil
 	}
+	// The background usync above only maps the EXACT phone JID given — it does no
+	// number canonicalization. A Brazilian mobile typed with the extra 9th digit
+	// (13-digit "55DD9XXXXXXXX") won't match a contact WhatsApp registered under
+	// the 12-digit form (and vice versa), so it returns no LID even though the
+	// number is reachable. IsOnWhatsApp runs the interactive `contact` usync that
+	// canonicalizes the number server-side, returns the real LID and seeds the LID
+	// store — so it resolves cold contacts the direct query misses.
+	if lid, ok := resolveLIDViaContactSync(ctx, cli, jid); ok {
+		return lid, nil
+	}
 	return types.EmptyJID, fmt.Errorf("usync returned no LID for %s (peer unreachable or not on WhatsApp)", jid.User)
+}
+
+// resolveLIDViaContactSync canonicalizes a phone number via IsOnWhatsApp (the
+// interactive contact-sync usync) and returns its LID. It returns false when the
+// number isn't on WhatsApp or exposes no LID. This is what lets cold calls to
+// Brazilian numbers connect whether or not the caller typed the 9th digit: the
+// contact sync resolves the number to the form WhatsApp actually registered.
+//
+// The canonical JID IsOnWhatsApp returns differs by whatsmeow version: newer
+// builds return the peer's LID directly; older ones return the canonical phone
+// JID (the corrected 9th-digit form). We handle both — use a LID as-is, and for
+// a phone JID resolve its LID through the direct usync / LID store, which works
+// once the number is in its registered form.
+func resolveLIDViaContactSync(ctx context.Context, cli *whatsmeow.Client, pn types.JID) (types.JID, bool) {
+	res, err := cli.IsOnWhatsApp(ctx, []string{pn.User})
+	if err != nil {
+		return types.EmptyJID, false
+	}
+	for _, r := range res {
+		if !r.IsIn || r.JID.IsEmpty() {
+			continue
+		}
+		if r.JID.Server == types.HiddenUserServer {
+			return r.JID, true // already a LID
+		}
+		// A canonical phone JID — resolve its LID from the store or a direct usync
+		// on the corrected number.
+		canonical := r.JID
+		if lid, err := cli.Store.LIDs.GetLIDForPN(ctx, canonical); err == nil && !lid.IsEmpty() {
+			return lid, true
+		}
+		if info, err := cli.GetUserInfo(ctx, []types.JID{canonical}); err == nil {
+			for _, ui := range info {
+				if !ui.LID.IsEmpty() {
+					return ui.LID, true
+				}
+			}
+		}
+		if lid, err := cli.Store.LIDs.GetLIDForPN(ctx, canonical); err == nil && !lid.IsEmpty() {
+			return lid, true
+		}
+	}
+	return types.EmptyJID, false
 }
 
 // callKeyPlaintext wraps the raw callKey as the Signal message body
