@@ -1,6 +1,6 @@
 module github.com/purpshell/meowcaller
 
-go 1.25.0
+go 1.26.0
 
 require (
 	github.com/hajimehoshi/go-mp3 v0.3.4
@@ -10,7 +10,7 @@ require (
 	github.com/pion/opus v0.1.0
 	github.com/pion/sctp v1.9.4
 	github.com/rs/zerolog v1.35.1
-	go.mau.fi/whatsmeow v0.0.0-20260821131652-72f22e67194f
+	go.mau.fi/whatsmeow v0.0.0-20260821141805-33cfac511629
 	google.golang.org/protobuf v1.36.12
 )
 
@@ -26,7 +26,7 @@ require (
 	github.com/pion/transport/v4 v4.0.1 // indirect
 	github.com/vektah/gqlparser/v2 v2.5.27 // indirect
 	go.mau.fi/libsignal v0.2.2 // indirect
-	go.mau.fi/util v0.10.0 // indirect
+	go.mau.fi/util v0.10.1-0.20260820140024-eb612d936fde // indirect
 	golang.org/x/crypto v0.55.0 // indirect
 	golang.org/x/net v0.58.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
